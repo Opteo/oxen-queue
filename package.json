@@ -9,7 +9,12 @@
     "mysql": "^2.14.1",
     "node-uuid": "^1.4.8"
   },
-  "scripts": {},
-  "devDependencies": {},
+  "scripts": {
+    "test": "mocha test/ --timeout 6000"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^3.5.3"
+  },
   "license": "MIT"
 }
