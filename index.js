@@ -1,1 +1,1 @@
-module.exports = require('./lib/queue')
+module.exports = require('./lib/queue').queue
