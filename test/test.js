@@ -10,6 +10,7 @@ describe('bjq', () => {
   describe('()', () => {
     it('should create a new queue instance', () => {
       const queue = new bjq({
+        mysql_connection : {},
         job_type: 'test',
         batch_size: 50
       })
@@ -19,10 +20,10 @@ describe('bjq', () => {
     })
     it('should fail if no job type specified', () => {
       try {
-        const queue = new bjq({})
+        const queue = new bjq({ mysql_connection : {}})
       } catch(err) {
         expect(err).to.not.be.null
-        expect(err.message).to.equal(messages['no-job-type'])
+        expect(err.message).to.equal(messages['no_job_type'])
       }
     })
   })
