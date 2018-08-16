@@ -1,4 +1,5 @@
 const _ = require('lodash')
+const crypto = require('crypto')
 const expect = require('chai').expect
 const assert = require('assert')
 const Promise = require('bluebird')
@@ -125,31 +126,35 @@ describe('oxen-queue', () => {
                 fastest_polling_rate: 2,
             })
 
-            const jobs_in = [
-                {
-                    body: 'yellow',
-                    priority: 2,
-                },
-                {
-                    body: 'the',
-                    priority: 1,
-                },
-                {
-                    body: 'submarine',
-                    priority: 3,
-                },
-            ]
+            const jobs_in = []
 
-            for (i of jobs_in) {
-                await queue.addJob(i)
+            for (i of _.range(10)) {
+                jobs_in.push({
+                    body: i,
+                    priority: i,
+                })
             }
+
+            const jobs_in_shuffled = _.shuffle(jobs_in)
+
+            await Promise.map(
+                jobs_in_shuffled,
+                async job => {
+                    await queue.addJob(job)
+                },
+                { concurrency: 5 }
+            )
+
+            // give mysql a moment to breathe
+            await Promise.delay(500)
 
             const jobs_out = []
 
             queue.process({
                 work_fn: async job => {
-                    jobs_out.push(job)
+                    jobs_out.push(+job)
                 },
+                concurrency: 1,
             })
 
             await waitUntil(() => {
@@ -158,7 +163,7 @@ describe('oxen-queue', () => {
 
             queue.stopProcessing()
 
-            expect(jobs_out).to.deep.equal(['the', 'yellow', 'submarine'])
+            expect(jobs_out).to.deep.equal(jobs_in.map(j => j.body))
         })
 
         it('should discard duplicate jobs', async () => {
