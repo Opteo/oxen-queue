@@ -10,7 +10,7 @@
     "lodash": "^4.17.4",
     "moment": "^2.19.2",
     "murmurhash": "^0.0.2",
-    "mysql": "^2.14.1",
+    "mysql2": "^1.6.1",
     "node-uuid": "^1.4.8"
   },
   "scripts": {
