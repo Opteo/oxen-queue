@@ -7,8 +7,22 @@ const Promise = require('bluebird')
 const lib = require('../lib/queue')
 const bjq = lib.queue
 const messages = lib.error_messages
-const mysql_connection = require('./mysql_connection_config')
 const db_table = 'oxen_queue_test'
+
+let mysql_connection = null
+
+try {
+    mysql_connection = require('./mysql_connection_config')
+} catch (e) {
+    mysql_connection = {
+        host: process.env.oxen_test_host,
+        user: process.env.oxen_test_user,
+        port: process.env.oxen_test_port,
+        password: process.env.oxen_test_password,
+        database: process.env.oxen_test_database,
+        timezone: process.env.oxen_test_timezone,
+    }
+}
 
 const waitUntil = async condition => {
     while (true) {
