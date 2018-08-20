@@ -15,12 +15,12 @@ try {
     mysql_connection = require('./mysql_connection_config')
 } catch (e) {
     mysql_connection = {
-        host: process.env.oxen_test_host,
-        user: process.env.oxen_test_user,
-        port: process.env.oxen_test_port,
-        password: process.env.oxen_test_password,
-        database: process.env.oxen_test_database,
-        timezone: process.env.oxen_test_timezone,
+        host: process.env.OXEN_TEST_HOST,
+        user: process.env.OXEN_TEST_USER,
+        port: process.env.OXEN_TEST_PORT,
+        password: process.env.OXEN_TEST_PASSWORD,
+        database: process.env.OXEN_TEST_DATABASE,
+        timezone: process.env.OXEN_TEST_TIMEZONE,
     }
 }
 
