@@ -5,7 +5,7 @@ const assert = require('assert')
 const Promise = require('bluebird')
 
 const lib = require('../lib/queue')
-const bjq = lib.queue
+const oxen_queue = lib.queue
 const messages = lib.error_messages
 const db_table = 'oxen_queue_test'
 
@@ -38,18 +38,18 @@ const waitUntil = async condition => {
 describe('oxen-queue', () => {
     describe('basic initialisation', () => {
         it('should create a new queue instance', () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection: {},
                 job_type: 'test',
                 fastest_polling_rate: 50,
             })
-            expect(queue).to.be.instanceof(bjq)
+            expect(queue).to.be.instanceof(oxen_queue)
             expect(queue.job_type).to.equal('test')
             expect(queue.fastest_polling_rate).to.equal(50)
         })
         it('should fail if no job type specified', () => {
             try {
-                const queue = new bjq({
+                const queue = new oxen_queue({
                     mysql_connection,
                 })
             } catch (err) {
@@ -59,7 +59,7 @@ describe('oxen-queue', () => {
         })
         it('should fail if no mysql connection', () => {
             try {
-                const queue = new bjq({
+                const queue = new oxen_queue({
                     job_type: 'something',
                 })
             } catch (err) {
@@ -69,7 +69,7 @@ describe('oxen-queue', () => {
         })
         it('should instantiate with defaults', () => {
             try {
-                const queue = new bjq({
+                const queue = new oxen_queue({
                     mysql_connection,
                     job_type: 'something',
                 })
@@ -83,7 +83,7 @@ describe('oxen-queue', () => {
         this.timeout(15000)
 
         beforeEach(async function() {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -95,7 +95,7 @@ describe('oxen-queue', () => {
         })
 
         it('should push and pop fifo', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -132,7 +132,7 @@ describe('oxen-queue', () => {
         })
 
         it('should respect priority', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -181,7 +181,7 @@ describe('oxen-queue', () => {
         })
 
         it('should discard duplicate jobs', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -237,7 +237,7 @@ describe('oxen-queue', () => {
             Note: this test is sensitive to clock drift between your database server and your testing server.
         */
         it('should delay jobs as specified', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -286,7 +286,7 @@ describe('oxen-queue', () => {
         })
 
         it('should error out when jobs exceed timeout', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -313,7 +313,7 @@ describe('oxen-queue', () => {
         })
 
         it('should save job results to the table', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
@@ -340,7 +340,7 @@ describe('oxen-queue', () => {
         })
 
         it('should start and stop processing without breaking', async () => {
-            const queue = new bjq({
+            const queue = new oxen_queue({
                 mysql_connection,
                 job_type: 'anything',
                 db_table,
