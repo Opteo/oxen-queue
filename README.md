@@ -60,7 +60,7 @@ Here's how you initialise the queue.
 const oxen_queue = require('oxen-queue')
 
 const ox = new oxen_queue({
-    mysql_connection: {
+    mysql_config: {
         // this object gets passed onto the mysql2 library
         user: 'mysql_user',
         password: 'mysql_password',

@@ -9,12 +9,12 @@ const oxen_queue = lib.queue
 const messages = lib.error_messages
 const db_table = 'oxen_queue_test'
 
-let mysql_connection = null
+let mysql_config = null
 
 try {
-    mysql_connection = require('./mysql_connection_config')
+    mysql_config = require('./mysql_connection_config')
 } catch (e) {
-    mysql_connection = {
+    mysql_config = {
         host: process.env.OXEN_TEST_HOST,
         user: process.env.OXEN_TEST_USER,
         port: process.env.OXEN_TEST_PORT,
@@ -39,7 +39,7 @@ describe('oxen-queue', () => {
     describe('basic initialisation', () => {
         it('should create a new queue instance', () => {
             const queue = new oxen_queue({
-                mysql_connection: {},
+                mysql_config: {},
                 job_type: 'test',
                 fastest_polling_rate: 50,
             })
@@ -50,7 +50,7 @@ describe('oxen-queue', () => {
         it('should fail if no job type specified', () => {
             try {
                 const queue = new oxen_queue({
-                    mysql_connection,
+                    mysql_config,
                 })
             } catch (err) {
                 expect(err).to.not.be.null
@@ -70,7 +70,7 @@ describe('oxen-queue', () => {
         it('should instantiate with defaults', () => {
             try {
                 const queue = new oxen_queue({
-                    mysql_connection,
+                    mysql_config,
                     job_type: 'something',
                 })
             } catch (err) {
@@ -84,7 +84,7 @@ describe('oxen-queue', () => {
 
         beforeEach(async function() {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
             })
@@ -96,7 +96,7 @@ describe('oxen-queue', () => {
 
         it('should push and pop fifo', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
@@ -133,7 +133,7 @@ describe('oxen-queue', () => {
 
         it('should respect priority', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
@@ -182,7 +182,7 @@ describe('oxen-queue', () => {
 
         it('should discard duplicate jobs', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
@@ -238,7 +238,7 @@ describe('oxen-queue', () => {
         */
         it('should delay jobs as specified', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
@@ -287,7 +287,7 @@ describe('oxen-queue', () => {
 
         it('should error out when jobs exceed timeout', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
@@ -314,7 +314,7 @@ describe('oxen-queue', () => {
 
         it('should save job results to the table', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
@@ -341,7 +341,7 @@ describe('oxen-queue', () => {
 
         it('should start and stop processing without breaking', async () => {
             const queue = new oxen_queue({
-                mysql_connection,
+                mysql_config,
                 job_type: 'anything',
                 db_table,
                 slowest_polling_rate: 200,
