@@ -110,11 +110,11 @@ ox.addJob('job_body_here')
 
 All `addJob` options:
 
-| option     | required? | default    | type                                                                                                                                                                   | description                                                                                                                                                           |
-| ---------- | --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| body       | required  | N/A        | Any                                                                                                                                                                    | The job body. Will be `JSON.stringify`'ed before saving to mysql.                                                                                                     |
-| unique_key | optional  | String/Int | Used for job deduplication. If you try to add two jobs with the same `unique_key`, Oxen will discard the second one. This constraint is removed once the job finishes. |
-| priority   | optional  | `_.now()`  | Int                                                                                                                                                                    | Defines the order that jobs will start processing. Smaller numbers will run first. Defaults to the current timestamp in milliseconds, so jobs will be popped `fifo` . |
+| option     | required? | default   | type       | description                                                                                                                                                            |
+| ---------- | --------- | --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| body       | required  | N/A       | Any        | The job body. Will be `JSON.stringify`'ed before saving to mysql.                                                                                                      |
+| unique_key | optional  | `null`    | String/Int | Used for job deduplication. If you try to add two jobs with the same `unique_key`, Oxen will discard the second one. This constraint is removed once the job finishes. |
+| priority   | optional  | `_.now()` | Int        | Defines the order that jobs will start processing. Smaller numbers will run first. Defaults to the current timestamp in milliseconds, so jobs will be popped `fifo` .  |
 
 ``
 
