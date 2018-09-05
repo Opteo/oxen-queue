@@ -87,7 +87,7 @@ All constructor options that can be used when calling `new Oxen({...})`:
 
 ### Adding Jobs
 
-Adding jobs is easy!
+Jobs are added using `addJob()` or `addJobs()`
 
 ```javascript
 const Oxen = require('oxen-queue')
@@ -106,6 +106,17 @@ ox.addJob({
 
 // shorthand for adding a job with no additional parameters
 ox.addJob('job_body_here')
+
+// adding many jobs at once (batched insert)
+ox.addJobs([
+    { body : 'we' },
+    { body : 'all' }
+    { body : 'live' }
+    { body : 'in' }
+    { body : 'a' }
+    { body : 'yellow' }
+    { body : 'submarine' }
+])
 ```
 
 All `addJob` options that can be used when calling `addJob({...}`:
@@ -148,8 +159,110 @@ All options that can be used with `process()`:
 | timeout            | optional  | 60      | Int (seconds)  | Jobs that don't return before the timeout elapses will be marked as failed.                                                                                                                                                                                                   |
 | recover_stuck_jobs | optional  | true    | Bool           | If the process running Oxen is killed while jobs are still processing, jobs can get "stuck" in a processing state where Oxen no longer tries to run them. If `recover_stuck_jobs` is `true`, Oxen will check for stuck jobs every minute and put them back in a queued state. |
 
+### Performance
+
+A few notes about Oxen's Performance.
+
+*   Assuming instantaneously-finishing jobs, the max throughput of Oxen depends on your `concurrency` and `fastest_polling_rate`. Since Oxen batches job fetches with a size of `concurrency`, an instance polling 10 times per second with a `concurrency` of 3 will at the maximum run 30 jobs per second. That said, if your jobs are so quick that you're limited by Oxen itself, Oxen may not be right for you.
+*   Oxen will never query for another set of jobs if the previous query still hasn't returned. Nor will it try to query any more jobs if the there aren't any available `concurrency` slots. This means that you can set a very aggressive `fastest_polling_rate` without hobbling your database -- a `fastest_polling_rate` of 2ms will never actually poll every 2ms, since mysql just doesn't query that fast!
+*   Thanks to the `polling_backoff_rate`, queues without any jobs will quickly go back to their `slowest_polling_rate`. At at `slowest_polling_rate` of `10000`, Oxen will only query your database every 10 seconds. This means that after a period of inactivity, Oxen may take up to 10 seconds to start any new jobs that are added.
+*   **important** Jobs are never removed from your database. It's up to you to clean them up when you no longer need their results or failure stacktraces. If you don't do this, your Oxen table may become very large! Even when very large (100GB+) it will still perform fine, but it becomes difficult to manually query anything that hasn't been carefully indexed.
+
+### Internals
+
+A big part of Oxen's appeal is that you can query it for your own uses. At the minimum, you'll probably want to query jobs for their **results** or **failure** messages.
+
+In more advanced cases, you may want to add [custom fields](#extra-fields) so that Oxen can be more tightly integrated into the rest of your application.
+
+#### Data Storage
+
+For your reference, here's the minimum schema of the table that Oxen uses:
+
+```sql
+CREATE TABLE `oxen_queue` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `batch_id` bigint(20) unsigned DEFAULT NULL,
+  `job_type` varchar(200) NOT NULL,
+  `created_ts` datetime DEFAULT CURRENT_TIMESTAMP,
+  `started_ts` datetime DEFAULT NULL,
+  `body` varchar(1000) DEFAULT NULL,
+  `status` varchar(100) NOT NULL DEFAULT 'waiting',
+  `result` mediumtext,
+  `recovered` tinyint(1) NOT NULL DEFAULT '0',
+  `running_time` smallint(5) unsigned DEFAULT NULL,
+  `unique_key` int(11) unsigned DEFAULT NULL,
+  `priority` bigint(20) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_key` (`unique_key`),
+  KEY `created_ts` (`created_ts`),
+  KEY `status` (`status`),
+  KEY `locking_update_v2` (`job_type`,`batch_id`,`status`,`priority`),
+  KEY `next_jobs_select` (`batch_id`,`priority`),
+  KEY `started_ts` (`started_ts`,`job_type`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 ```
-TODO:
-- Job consumers section
-- Performance section
+
+Here's what the fields mean:
+
+*   **`id`** the job ID.
+*   **`batch_id`** used to avoid race conditions when running Oxen on independent Node.js processes.
+*   **`job_type`** a queue's indentifier
+*   **`created_ts`** when the job was created and marked as `waiting`
+*   **`started_ts`** when the job was marked as `processing` and passed over to your `work_fn()`
+*   **`body`** the job body
+*   **`status`** determines the lifecycle of a job. Can be `waiting`, `processing`, `success`, `error`, `stuck`
+*   **`result`** if the status is `success`, it will contain the return value of your `work_fn` in JSON. If the status is `error`, it will contain the error message and stacktrace
+*   **`recovered`** default `0`, will be set to `1` if the job was recovered from a `stuck` status.
+*   **`running_time`** the number of seconds during which the job was `processing`. Not actually read by Oxen, but useful for sanity checking.
+*   **`unique_key`** used for job deduplication. Depends on a mysql unique index.
+*   **`priority`** used for choosing which jobs to run first. Within a `job_type`, lower numbers will be processed first.
+
+#### Extra Fields
+
+If you add an extra column to your `oxen_queue` table, Oxen will automatically populate that field for you based on what you pass into `job_body`.
+
+Here's an example:
+
+```javascript
+/*
+    This example assumes that you've added the fields user_id and payment_method to the oxen_queue table.
+*/
+
+const Oxen = require('oxen-queue')
+
+// initialize a queue with an extra_fields array
+const ox = new Oxen({
+    mysql_config: { ... },
+    job_type: 'sync_user_subscription_statuses',
+    extra_fields : ['user_id', 'payment_method']
+})
+
+// add a job with those extra_fields as keys in your job_body
+ox.addJob({
+    body: {
+        user_id: 123,
+        payment_method: 'paypal',
+        some_other_thing : { whatever : 'value'}
+    }
+})
+
+// done! Your database table will now have the user_id and payment_method fields.  
+```
+
+##### Why add them as their own fields? They're already in the job_body...
+
+Because you can index them! In our previous example, if you add an indexes to `user_id` and `payment_method`, you'll be able to query your table very effectively:
+
+```sql
+    # Show all failing jobs for user_id 123
+    SELECT created_ts, started_ts, running_time, body, result
+    FROM oxen_queue
+    WHERE user_id = 123 AND STATUS = 'error';
+
+
+    # Show average running time per payment_method for jobs started in the last 6 hours.
+    SELECT payment_method, AVG(running_time)
+    FROM oxen_queue
+    WHERE started_ts > (NOW() - INTERVAL 6 HOUR)
+    GROUP BY payment_method;
 ```
