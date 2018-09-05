@@ -8,12 +8,12 @@ A no-frills, high-throughput worker queue backed by MySQL.
 
 ### Features:
 
--   Job persistence
--   Job priority
--   Job deduplication
--   Concurrency
--   Delayed jobs
--   Multi-process/server operation
+*   Job persistence
+*   Job priority
+*   Job deduplication
+*   Concurrency
+*   Delayed jobs
+*   Multi-process/server operation
 
 ## Motivation
 
@@ -23,24 +23,24 @@ There are already several great job queue libraries out there, but in the contex
 
 You'll be happy with Oxen if you:
 
--   Have many, many jobs (millions per day isn't unreasonable)
--   You're more interested in throughput than latency when it comes to job completion
--   You want to be able to run arbitrary queries on the queue using SQL
--   You're already running MySQL, and you don't want to add a another database to your stack (eg. Kafka)
+*   Have many, many jobs (millions per day isn't unreasonable)
+*   You're more interested in throughput than latency when it comes to job completion
+*   You want to be able to run arbitrary queries on the queue using SQL
+*   You're already running MySQL, and you don't want to add a another database to your stack (eg. Kafka)
 
 Oxen isn't for you if:
 
--   You need retry mechanisms for failed jobs
--   Your jobs are user-facing and need to start in sub-second latencies
--   You need a UI, and you don't want to hack something together yourself
--   Using MySQL for a queue makes you feel icky
+*   You need retry mechanisms for failed jobs
+*   Your jobs are user-facing and need to start in sub-second latencies
+*   You need a UI, and you don't want to hack something together yourself
+*   Using MySQL for a queue makes you feel icky
 
 ## Installation
 
 **Infrastructure Requirements**:
 
--   Node 7 or higher
--   MySQL
+*   Node 7 or higher
+*   MySQL
 
 **NPM**
 
@@ -85,14 +85,14 @@ All constructor options that can be used when calling `new Oxen({...})`:
 | slowest_polling_rate | optional  | `10000`      | Int                                                                      | The longest delay between two polls of your table (ms)                                                                                                                                                                                       |
 | polling_backoff_rate | optional  | `1.1`        | Int                                                                      | The rate at which Oxen will slow polling if it finds no more jobs. For example, a rate of `1.2` will cause the next poll to be done 20% later than the last one.                                                                             |
 
-### Jobs
+### Adding Jobs
 
-Each job is saved as a single row in your table. The actual job body is JSON.stringify'ed and put into a VARCHAR(1000) field, so anything that will survive that process will fit into a job. If 1000 characters isn't enough for you, feel free to alter your table to use a TEXT field.
+Adding jobs is easy!
 
 ```javascript
-const oxen_queue = require('oxen-queue')
+const Oxen = require('oxen-queue')
 
-const ox = new oxen_queue({ /* Initialisation args here */ }}
+const ox = new Oxen({ /* Initialisation args here */ }}
 
 // adding a job with a string body
 ox.addJob({
@@ -108,7 +108,7 @@ ox.addJob({
 ox.addJob('job_body_here')
 ```
 
-All `addJob` options:
+All `addJob` options that can be used when calling `addJob({...}`:
 
 | option     | required? | default      | type       | description                                                                                                                                                            |
 | ---------- | --------- | ------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -116,7 +116,37 @@ All `addJob` options:
 | unique_key | optional  | `null`       | String/Int | Used for job deduplication. If you try to add two jobs with the same `unique_key`, Oxen will discard the second one. This constraint is removed once the job finishes. |
 | priority   | optional  | `Date.now()` | Int        | Defines the order that jobs will start processing. Smaller numbers will run first. Defaults to the current timestamp in milliseconds, so jobs will be popped `fifo` .  |
 
-``
+### Consuming Jobs
+
+Jobs are consumed using `process()`.
+
+```javascript
+const Oxen = require('oxen-queue')
+
+const ox = new Oxen({ /* Initialisation args here */ }}
+
+ox.process({
+    work_fn : async function (job_body) {
+        // Do something with your job here
+        console.log(job_body)
+
+        // The job will be considered finished when the promise resolves,
+        // or failed when the promise rejects.
+    }
+    concurrency : 80,
+    timeout : 60 * 5,
+    recover_stuck_jobs : false,
+})
+```
+
+All options that can be used with `process()`:
+
+| option             | required? | default | type           | description                                                                                                                                                                                                                                                                   |
+| ------------------ | --------- | ------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| work_fn            | required  | N/A     | Async Function | Your work function. It only takes one argument (here `job_body`), which is the body defined in `addJob()`. It must return a `Promise`.                                                                                                                                        |
+| concurrency        | optional  | 3       | Int            | The number of jobs that Oxen will run at the same time. Higher numbers here allow Oxen to batch job fetches, increasing throughput.                                                                                                                                           |
+| timeout            | optional  | 60      | Int (seconds)  | Jobs that don't return before the timeout elapses will be marked as failed.                                                                                                                                                                                                   |
+| recover_stuck_jobs | optional  | true    | Bool           | If the process running Oxen is killed while jobs are still processing, jobs can get "stuck" in a processing state where Oxen no longer tries to run them. If `recover_stuck_jobs` is `true`, Oxen will check for stuck jobs every minute and put them back in a queued state. |
 
 ```
 TODO:
