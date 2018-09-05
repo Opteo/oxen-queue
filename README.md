@@ -1,8 +1,8 @@
 # Oxen Queue
 
-![CircleCI (all branches)](https://img.shields.io/circleci/project/github/Opteo/oxen-queue.svg)
 ![npm](https://img.shields.io/npm/v/oxen-queue.svg)
-![David](https://img.shields.io/david/expressjs/express.svg)
+![CircleCI (all branches)](https://img.shields.io/circleci/project/github/Opteo/oxen-queue.svg)
+![David](https://img.shields.io/david/Opteo/oxen-queue.svg)
 
 A no-frills, resilient worker queue backed by MySQL.
 
