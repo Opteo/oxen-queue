@@ -4,7 +4,7 @@ Tests: [![CircleCI](https://circleci.com/gh/Opteo/oxen-queue.svg?style=svg)](htt
 
 # Oxen Queue
 
-A no-frills, high-throughput worker queue backed by MySQL.
+A no-frills, resilient worker queue backed by MySQL.
 
 ### Features:
 
@@ -17,7 +17,7 @@ A no-frills, high-throughput worker queue backed by MySQL.
 
 ## Motivation
 
-Oxen is designed to help you chew through a very high number of jobs by leveraging significant concurrency. It is resilient to misbehaving jobs, dropped database connections, and other ills. At Opteo, we mostly use it to work though scheduled batch tasks that aren't reasonable to run in a fat Promise.all().
+Oxen is designed to help you chew through a very high number of jobs by leveraging significant concurrency. It is resilient to misbehaving jobs, dropped database connections, and other ills.
 
 There are already several great job queue libraries out there, but in the context of our use-cases, they either struggled with a high number of jobs, handled unexpected disconnections poorly, or had issues with race conditions.
 
@@ -121,11 +121,12 @@ ox.addJobs([
 
 All `addJob` options that can be used when calling `addJob({...}`:
 
-| option     | required? | default      | type       | description                                                                                                                                                            |
-| ---------- | --------- | ------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| body       | required  | N/A          | Any        | The job body. Will be `JSON.stringify`'ed before saving to mysql.                                                                                                      |
-| unique_key | optional  | `null`       | String/Int | Used for job deduplication. If you try to add two jobs with the same `unique_key`, Oxen will discard the second one. This constraint is removed once the job finishes. |
-| priority   | optional  | `Date.now()` | Int        | Defines the order that jobs will start processing. Smaller numbers will run first. Defaults to the current timestamp in milliseconds, so jobs will be popped `fifo` .  |
+| option     | required? | default      | type       | description                                                                                                                                                                                                 |
+| ---------- | --------- | ------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| body       | required  | N/A          | Any        | The job body. Will be `JSON.stringify`'ed before saving to mysql.                                                                                                                                           |
+| unique_key | optional  | `null`       | String/Int | Used for job deduplication. If you try to add two jobs with the same `unique_key`, Oxen will discard the second one. This constraint is removed once the job finishes.                                      |
+| priority   | optional  | `Date.now()` | Int        | Defines the order that jobs will start processing. Smaller numbers will run first. Defaults to the current timestamp in milliseconds, so by default jobs will be popped `fifo` .                            |
+| start_time | optional  | `new Date()` | Date       | Defines the time when Oxen will start trying to process this job. Accepts anything that `new Date( ... )` does, such as ISO formatted strings, Date objects, and [`moment`](https://momentjs.com/) objects. |
 
 ### Consuming Jobs
 
@@ -136,28 +137,36 @@ const Oxen = require('oxen-queue')
 
 const ox = new Oxen({ /* Initialisation args here */ }}
 
+// start processing
 ox.process({
     work_fn : async function (job_body) {
+
         // Do something with your job here
         console.log(job_body)
 
+        return bigBadBackendThing(job_body.foo)
         // The job will be considered finished when the promise resolves,
-        // or failed when the promise rejects.
+        // or failed if the promise rejects.
     }
-    concurrency : 80,
-    timeout : 60 * 5,
-    recover_stuck_jobs : false,
+    concurrency : 25,
 })
 ```
 
+Your `work_fn` will be called once per job that you added with `addJob()`. It depends on promise resolution to know when the job is done, so make sure you return a promise!
+
+Oxen will save the return of `work_fn` in the `result` field of the table.
+If your jobs return large results, we recommend saving your actual result somewhere else in your infrastructure, and to return a small debugging marker such as "ok" or even `null` or `undefined`. This will keep the Oxen table from growing unnecessarily large.
+
+If for any reason you want to stop processing jobs (for example, in the event of a graceful shutdown), call `ox.stopProcessing()`
+
 All options that can be used with `process()`:
 
-| option             | required? | default | type           | description                                                                                                                                                                                                                                                                   |
-| ------------------ | --------- | ------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| work_fn            | required  | N/A     | Async Function | Your work function. It only takes one argument (here `job_body`), which is the body defined in `addJob()`. It must return a `Promise`.                                                                                                                                        |
-| concurrency        | optional  | 3       | Int            | The number of jobs that Oxen will run at the same time. Higher numbers here allow Oxen to batch job fetches, increasing throughput.                                                                                                                                           |
-| timeout            | optional  | 60      | Int (seconds)  | Jobs that don't return before the timeout elapses will be marked as failed.                                                                                                                                                                                                   |
-| recover_stuck_jobs | optional  | true    | Bool           | If the process running Oxen is killed while jobs are still processing, jobs can get "stuck" in a processing state where Oxen no longer tries to run them. If `recover_stuck_jobs` is `true`, Oxen will check for stuck jobs every minute and put them back in a queued state. |
+| option             | required? | default | type           | description                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | --------- | ------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| work_fn            | required  | N/A     | Async Function | Your work function. It only takes one argument (here `job_body`), which is the body defined in `addJob()`. It must return a `Promise`.                                                                                                                                                                                                  |
+| concurrency        | optional  | 3       | Int            | The number of jobs that Oxen will run at the same time. Higher numbers here allow Oxen to batch job fetches, increasing throughput.                                                                                                                                                                                                     |
+| timeout            | optional  | 60      | Int (seconds)  | Jobs that don't return before the timeout elapses will be marked as failed.                                                                                                                                                                                                                                                             |
+| recover_stuck_jobs | optional  | true    | Bool           | If the process running Oxen is killed while jobs are still processing, jobs can get "stuck" in a processing state where Oxen no longer tries to run them. If `recover_stuck_jobs` is `true`, Oxen will check for stuck jobs every minute and put them back in a queued state. If it isn't safe to run a job twice, set this to `false`. |
 
 ### Performance
 
@@ -221,7 +230,7 @@ Here's what the fields mean:
 
 If you add an extra column to your `oxen_queue` table, Oxen will automatically populate that field for you based on what you pass into `job_body`.
 
-Here's an example:
+Here's an example. Imagine that you have a queue dedicated to updating your payment providers with your user metadata:
 
 ```javascript
 /*
@@ -249,6 +258,8 @@ ox.addJob({
 // done! Your database table will now have the user_id and payment_method fields.  
 ```
 
+_Note that `user_id` and `payment_method` will still also be available in `job_body`._
+
 ##### Why add them as their own fields? They're already in the job_body...
 
 Because you can index them! In our previous example, if you add an indexes to `user_id` and `payment_method`, you'll be able to query your table very effectively:
@@ -266,3 +277,9 @@ Because you can index them! In our previous example, if you add an indexes to `u
     WHERE started_ts > (NOW() - INTERVAL 6 HOUR)
     GROUP BY payment_method;
 ```
+
+This is where using an SQL-backed queue can really help debug tricky errors.
+
+## Authors
+
+Oxen is written and maintained by the dev team at [Opteo](https://opteo.com). Made with love in London.
