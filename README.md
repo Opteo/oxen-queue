@@ -1,8 +1,8 @@
-CAUTION: This project isn't yet ready for use by humans.
-
-Tests: [![CircleCI](https://circleci.com/gh/Opteo/oxen-queue.svg?style=svg)](https://circleci.com/gh/Opteo/oxen-queue)
-
 # Oxen Queue
+
+![CircleCI (all branches)](https://img.shields.io/circleci/project/github/Opteo/oxen-queue.svg)
+![npm](https://img.shields.io/npm/v/oxen-queue.svg)
+![David](https://img.shields.io/david/expressjs/express.svg)
 
 A no-frills, resilient worker queue backed by MySQL.
 

@@ -1,6 +1,6 @@
 {
   "name": "oxen-queue",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "engines": {
     "node": ">=7.0.0"
   },
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "bluebird": "^3.5.1",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.10",
     "mysql2": "^1.6.1"
   },
   "scripts": {
