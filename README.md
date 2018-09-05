@@ -205,7 +205,7 @@ CREATE TABLE `oxen_queue` (
   UNIQUE KEY `unique_key` (`unique_key`),
   KEY `created_ts` (`created_ts`),
   KEY `status` (`status`),
-  KEY `locking_update_v2` (`job_type`,`batch_id`,`status`,`priority`),
+  KEY `locking_update` (`job_type`,`batch_id`,`status`,`priority`),
   KEY `next_jobs_select` (`batch_id`,`priority`),
   KEY `started_ts` (`started_ts`,`job_type`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
