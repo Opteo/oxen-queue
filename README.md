@@ -172,10 +172,10 @@ All options that can be used with `process()`:
 
 A few notes about Oxen's Performance.
 
+*   **important** Jobs are never removed from your database. It's up to you to clean them up when you no longer need their results or failure stacktraces. If you don't do this, your Oxen table may become very large! Even when very large (100GB+) it will still perform fine, but it becomes difficult to manually query anything that hasn't been carefully indexed.
 *   Assuming instantaneously-finishing jobs, the max throughput of Oxen depends on your `concurrency` and `fastest_polling_rate`. Since Oxen batches job fetches with a size of `concurrency`, an instance polling 10 times per second with a `concurrency` of 3 will at the maximum run 30 jobs per second. That said, if your jobs are so quick that you're limited by Oxen itself, Oxen may not be right for you.
 *   Oxen will never query for another set of jobs if the previous query still hasn't returned. Nor will it try to query any more jobs if the there aren't any available `concurrency` slots. This means that you can set a very aggressive `fastest_polling_rate` without hobbling your database -- a `fastest_polling_rate` of 2ms will never actually poll every 2ms, since mysql just doesn't query that fast!
 *   Thanks to the `polling_backoff_rate`, queues without any jobs will quickly go back to their `slowest_polling_rate`. At at `slowest_polling_rate` of `10000`, Oxen will only query your database every 10 seconds. This means that after a period of inactivity, Oxen may take up to 10 seconds to start any new jobs that are added.
-*   **important** Jobs are never removed from your database. It's up to you to clean them up when you no longer need their results or failure stacktraces. If you don't do this, your Oxen table may become very large! Even when very large (100GB+) it will still perform fine, but it becomes difficult to manually query anything that hasn't been carefully indexed.
 
 ### Internals
 
