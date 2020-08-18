@@ -11,9 +11,9 @@
     "url": "https://github.com/Opteo/oxen-queue.git"
   },
   "dependencies": {
-    "bluebird": "^3.5.1",
-    "lodash": "^4.17.10",
-    "mysql2": "^1.6.1"
+    "bluebird": "^3.7.2",
+    "lodash": "^4.17.20",
+    "mysql2": "^2.1.0"
   },
   "scripts": {
     "test": "mocha test/ --timeout 6000 --exit"
