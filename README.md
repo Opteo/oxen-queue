@@ -188,7 +188,7 @@ In more advanced cases, you may want to add [custom fields](#extra-fields) so th
 For your reference, here's the minimum schema of the table that Oxen uses:
 
 ```sql
-CREATE TABLE `oxen_queue` (
+CREATE TABLE IF NOT EXISTS `oxen_queue` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `batch_id` bigint(20) unsigned DEFAULT NULL,
   `job_type` varchar(200) NOT NULL,
