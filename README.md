@@ -147,7 +147,7 @@ ox.process({
         return bigBadBackendThing(job_body.foo)
         // The job will be considered finished when the promise resolves,
         // or failed if the promise rejects.
-    }
+    },
     concurrency : 25,
 })
 ```
