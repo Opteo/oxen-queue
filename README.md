@@ -4,12 +4,12 @@ A no-frills, resilient worker queue backed by MySQL.
 
 ### Features:
 
-*   Job persistence
-*   Job priority
-*   Job deduplication
-*   Concurrency
-*   Delayed jobs
-*   Multi-process/server operation
+-   Job persistence
+-   Job priority
+-   Job deduplication
+-   Concurrency
+-   Delayed jobs
+-   Multi-process/server operation
 
 ## Motivation
 
@@ -19,24 +19,23 @@ There are already several great job queue libraries out there, but in the contex
 
 You'll be happy with Oxen if you:
 
-*   Have many, many jobs (millions per day isn't unreasonable)
-*   You're more interested in throughput than latency when it comes to job completion
-*   You want to be able to run arbitrary queries on the queue using SQL
-*   You're already running MySQL, and you don't want to add a another database to your stack (eg. Kafka)
+-   Have many, many jobs (millions per day isn't unreasonable)
+-   You're more interested in throughput than latency when it comes to job completion
+-   You want to be able to run arbitrary queries on the queue using SQL
+-   You're already running MySQL, and you don't want to add a another database to your stack (eg. Kafka)
 
 Oxen isn't for you if:
 
-*   You need retry mechanisms for failed jobs
-*   Your jobs are user-facing and need to start in sub-second latencies
-*   You need a UI, and you don't want to hack something together yourself
-*   Using MySQL for a queue makes you feel icky
+-   Your jobs are user-facing and need to start in sub-second latencies
+-   You need a UI, and you don't want to hack something together yourself
+-   Using MySQL for a queue makes you feel icky
 
 ## Installation
 
 **Infrastructure Requirements**:
 
-*   Node 7 or higher
-*   MySQL
+-   Node 7 or higher
+-   MySQL
 
 **NPM**
 
@@ -164,14 +163,35 @@ All options that can be used with `process()`:
 | timeout            | optional  | 60      | Int (seconds)  | Jobs that don't return before the timeout elapses will be marked as failed.                                                                                                                                                                                                                                                             |
 | recover_stuck_jobs | optional  | true    | Bool           | If the process running Oxen is killed while jobs are still processing, jobs can get "stuck" in a processing state where Oxen no longer tries to run them. If `recover_stuck_jobs` is `true`, Oxen will check for stuck jobs every minute and put them back in a queued state. If it isn't safe to run a job twice, set this to `false`. |
 
+### Retrying Jobs
+
+By default, jobs are never retried.
+
+If you want to retry a job, you can return a object with a `_oxen_queue_retry_seconds` key from your `work_fn`. This special return value will cause Oxen to retry the job after the specified number of seconds.
+
+```javascript
+// This will retry the job in 60 seconds if it fails.
+ox.process({
+    work_fn: async function (job_body) {
+        try {
+            await bigBadBackendThing(job_body.foo)
+        } catch (e) {
+            return {
+                _oxen_queue_retry_seconds: 60,
+            }
+        }
+    },
+})
+```
+
 ### Performance
 
 A few notes about Oxen's Performance.
 
-*   **important** Jobs are never removed from your database. It's up to you to clean them up when you no longer need their results or failure stacktraces. If you don't do this, your Oxen table may become very large! Even when very large (100GB+) it will still perform fine, but it becomes difficult to manually query anything that hasn't been carefully indexed.
-*   Assuming instantaneously-finishing jobs, the max throughput of Oxen depends on your `concurrency` and `fastest_polling_rate`. Since Oxen batches job fetches with a size of `concurrency`, an instance polling 10 times per second with a `concurrency` of 3 will at the maximum run 30 jobs per second. That said, if your jobs are so quick that you're limited by Oxen itself, Oxen may not be right for you.
-*   Oxen will never query for another set of jobs if the previous query still hasn't returned. Nor will it try to query any more jobs if the there aren't any available `concurrency` slots. This means that you can set a very aggressive `fastest_polling_rate` without hobbling your database -- a `fastest_polling_rate` of 2ms will never actually poll every 2ms, since mysql just doesn't query that fast!
-*   Thanks to the `polling_backoff_rate`, queues without any jobs will quickly go back to their `slowest_polling_rate`. At at `slowest_polling_rate` of `10000`, Oxen will only query your database every 10 seconds. This means that after a period of inactivity, Oxen may take up to 10 seconds to start any new jobs that are added.
+-   **important** Jobs are never removed from your database. It's up to you to clean them up when you no longer need their results or failure stacktraces. If you don't do this, your Oxen table may become very large! Even when very large (100GB+) it will still perform fine, but it becomes difficult to manually query anything that hasn't been carefully indexed.
+-   Assuming instantaneously-finishing jobs, the max throughput of Oxen depends on your `concurrency` and `fastest_polling_rate`. Since Oxen batches job fetches with a size of `concurrency`, an instance polling 10 times per second with a `concurrency` of 3 will at the maximum run 30 jobs per second. That said, if your jobs are so quick that you're limited by Oxen itself, Oxen may not be right for you.
+-   Oxen will never query for another set of jobs if the previous query still hasn't returned. Nor will it try to query any more jobs if the there aren't any available `concurrency` slots. This means that you can set a very aggressive `fastest_polling_rate` without hobbling your database -- a `fastest_polling_rate` of 2ms will never actually poll every 2ms, since mysql just doesn't query that fast!
+-   Thanks to the `polling_backoff_rate`, queues without any jobs will quickly go back to their `slowest_polling_rate`. At at `slowest_polling_rate` of `10000`, Oxen will only query your database every 10 seconds. This means that after a period of inactivity, Oxen may take up to 10 seconds to start any new jobs that are added.
 
 ### Internals
 
@@ -209,18 +229,18 @@ CREATE TABLE IF NOT EXISTS `oxen_queue` (
 
 Here's what the fields mean:
 
-*   **`id`** the job ID.
-*   **`batch_id`** used to avoid race conditions when running Oxen on independent Node.js processes.
-*   **`job_type`** a queue's indentifier
-*   **`created_ts`** when the job was created and marked as `waiting`
-*   **`started_ts`** when the job was marked as `processing` and passed over to your `work_fn()`
-*   **`body`** the job body
-*   **`status`** determines the lifecycle of a job. Can be `waiting`, `processing`, `success`, `error`, `stuck`
-*   **`result`** if the status is `success`, it will contain the return value of your `work_fn` in JSON. If the status is `error`, it will contain the error message and stacktrace
-*   **`recovered`** default `0`, will be set to `1` if the job was recovered from a `stuck` status.
-*   **`running_time`** the number of seconds during which the job was `processing`. Not actually read by Oxen, but useful for sanity checking.
-*   **`unique_key`** used for job deduplication. Depends on a mysql unique index.
-*   **`priority`** used for choosing which jobs to run first. Within a `job_type`, lower numbers will be processed first.
+-   **`id`** the job ID.
+-   **`batch_id`** used to avoid race conditions when running Oxen on independent Node.js processes.
+-   **`job_type`** a queue's indentifier
+-   **`created_ts`** when the job was created and marked as `waiting`
+-   **`started_ts`** when the job was marked as `processing` and passed over to your `work_fn()`
+-   **`body`** the job body
+-   **`status`** determines the lifecycle of a job. Can be `waiting`, `processing`, `success`, `error`, `stuck`
+-   **`result`** if the status is `success`, it will contain the return value of your `work_fn` in JSON. If the status is `error`, it will contain the error message and stacktrace
+-   **`recovered`** default `0`, will be set to `1` if the job was recovered from a `stuck` status.
+-   **`running_time`** the number of seconds during which the job was `processing`. Not actually read by Oxen, but useful for sanity checking.
+-   **`unique_key`** used for job deduplication. Depends on a mysql unique index.
+-   **`priority`** used for choosing which jobs to run first. Within a `job_type`, lower numbers will be processed first.
 
 #### Extra Fields
 
@@ -251,7 +271,7 @@ ox.addJob({
     }
 })
 
-// done! Your database table will now have the user_id and payment_method fields.  
+// done! Your database table will now have the user_id and payment_method fields.
 ```
 
 _Note that `user_id` and `payment_method` will still also be available in `job_body`._

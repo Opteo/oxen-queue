@@ -26,7 +26,7 @@ try {
 
 const waitUntil = async condition => {
     while (true) {
-        if (condition()) {
+        if (await condition()) {
             break
         }
         await Promise.delay(20)
@@ -79,10 +79,10 @@ describe('oxen-queue', () => {
         })
     })
 
-    describe('Connect to database and do basic operations', function() {
+    describe('Connect to database and do basic operations', function () {
         this.timeout(15000)
 
-        beforeEach(async function() {
+        beforeEach(async function () {
             const queue = new oxen_queue({
                 mysql_config,
                 job_type: 'anything',
@@ -404,6 +404,72 @@ describe('oxen-queue', () => {
             await Promise.delay(1000)
 
             expect(jobs_out.length).to.equal(job_count_3)
+        })
+
+        it('should correctly re-enqueue jobs when they are marked as retryable', async () => {
+            const queue = new oxen_queue({
+                mysql_config,
+                job_type: 'anything',
+                db_table,
+                slowest_polling_rate: 200,
+                fastest_polling_rate: 2,
+            })
+
+            const jobs_in = [
+                {
+                    body: 'first',
+                },
+                {
+                    body: 'second',
+                },
+                {
+                    body: 'third',
+                },
+            ]
+
+            for (const i of jobs_in) {
+                await queue.addJob(i)
+            }
+
+            let attempts = 0
+
+            queue.process({
+                work_fn: async job => {
+                    console.log('doing job', job)
+                    if (job === 'first') {
+                        throw new Error('first job failed')
+                    }
+                    if (job === 'second') {
+                        if (attempts === 3) {
+                            return 'ok'
+                        }
+                        attempts++
+                        return {
+                            _oxen_queue_retry_seconds: 1,
+                        }
+                    }
+                    return 'ok'
+                },
+            })
+
+            let allRows = []
+
+            await waitUntil(async () => {
+                allRows = await queue.selectEntireTable()
+                return allRows?.filter(row => row.status === 'success').length === 1
+            })
+
+            expect(allRows.filter(row => row.status === 'success').length).to.equal(1) // one is still retrying
+
+            await waitUntil(async () => {
+                allRows = await queue.selectEntireTable()
+                return allRows?.filter(row => row.status === 'success').length === 2
+            })
+
+            expect(allRows.filter(row => row.status === 'success').length).to.equal(2) // both successful
+            expect(allRows.filter(row => row.recovered > 2).length).to.equal(1) // one was retried over 2 times
+
+            queue.stopProcessing()
         })
     })
 })
