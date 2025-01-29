@@ -1,6 +1,6 @@
 {
   "name": "oxen-queue",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "A resilient worker queue backed by MySQL.",
   "engines": {
     "node": ">=7.0.0"
@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "bluebird": "^3.7.2",
-    "lodash": "^4.17.20",
-    "mysql2": "^3.6.3"
+    "lodash": "^4.17.21",
+    "mysql2": "^3.12.0"
   },
   "scripts": {
     "test": "mocha test/ --timeout 6000 --exit"
